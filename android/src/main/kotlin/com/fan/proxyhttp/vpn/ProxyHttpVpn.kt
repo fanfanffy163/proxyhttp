@@ -2,20 +2,24 @@ package com.fan.proxyhttp.vpn
 
 import android.app.Activity
 import android.app.PendingIntent
+import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.net.ProxyInfo
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
+import android.os.StrictMode
 import android.util.Log
+import java.lang.ref.SoftReference
 import java.net.Socket
 import java.util.concurrent.ConcurrentHashMap
 
-class ProxyHttpVpn : VpnService() {
-    private var vpnInterface: ParcelFileDescriptor? = null
-    // 存储非HTTP流量的Socket连接（避免重复创建）
-    private val directSockets = ConcurrentHashMap<String, Socket>()
+class ProxyHttpVpn : VpnService(), ServiceControl {
+    private lateinit var vpnInterface: ParcelFileDescriptor
+    private var isRunning = false
+
+    private var tun2SocksService: Tun2SocksControl? = null
 
     companion object {
 
@@ -80,6 +84,10 @@ class ProxyHttpVpn : VpnService() {
             disconnect()
             START_NOT_STICKY
         } else {
+            if(!V2RayManager.startCoreLoop()){
+                START_NOT_STICKY
+            }
+
             val proxyHost = intent.getStringExtra(PROXY_HOST_KEY) ?: "127.0.0.1";
             val proxyPort = intent.getIntExtra(PROXY_PORT_KEY, 9099)
             connect(proxyHost, proxyPort)
@@ -92,10 +100,9 @@ class ProxyHttpVpn : VpnService() {
 
         val build = Builder()
             .setMtu(MAX_PACKET_LEN)
-            .addAddress(VIRTUAL_HOST, 32)
+            .addAddress(VIRTUAL_HOST, 30)
             .addRoute("0.0.0.0", 0)
             .setSession(baseContext.applicationInfo.name)
-            .setBlocking(true)
 
         build.setConfigureIntent(
             PendingIntent.getActivity(
@@ -106,27 +113,68 @@ class ProxyHttpVpn : VpnService() {
             )
         )
 
+        build.addDisallowedApplication(this.packageName)
+
+        isRunning = true;
         vpnInterface = build.apply {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 setMetered(false)
-                setHttpProxy(ProxyInfo.buildDirectProxy(proxyHost, proxyPort))
+                //setHttpProxy(ProxyInfo.buildDirectProxy(proxyHost, proxyPort))
             }
-        }.establish()
+        }.establish()!!
 
-        if(vpnInterface != null){
+        runTun2socks()
+    }
 
-        }
+    /**
+     * Runs the tun2socks process.
+     * Starts the tun2socks process with the appropriate parameters.
+     */
+    private fun runTun2socks() {
+        tun2SocksService = TProxyService(
+            context = applicationContext,
+            vpnInterface = vpnInterface,
+            isRunningProvider = { isRunning },
+            restartCallback = { runTun2socks() }
+        )
+        tun2SocksService?.startTun2Socks()
     }
 
     private fun disconnect(){
+        tun2SocksService?.stopTun2Socks()
+        tun2SocksService = null
+
+        V2RayManager.stopCoreLoop();
+
         vpnInterface?.close();
-        // 关闭所有直接连接的Socket
-        directSockets.values.forEach { it.close() }
-        directSockets.clear()
     }
 
     override fun onDestroy() {
         super.onDestroy()
         disconnect()
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        val policy = StrictMode.ThreadPolicy.Builder().permitAll().build()
+        StrictMode.setThreadPolicy(policy)
+        V2RayManager.serviceControl = SoftReference(this)
+    }
+
+    override fun startService() {
+        TODO("Not yet implemented")
+    }
+
+    override fun stopService() {
+        isRunning = false
+        disconnect()
+    }
+
+    override fun getService(): Service {
+        return this;
+    }
+
+    override fun vpnProtect(socket: Int): Boolean {
+        TODO("Not yet implemented")
     }
 }

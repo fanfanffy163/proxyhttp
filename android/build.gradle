@@ -48,6 +48,9 @@ android {
     }
 
     dependencies {
+        // Core Libraries
+        // implementation(fileTree(dir: 'libs', include: ['*.jar', '*.aar']))
+        api project(":localResp:v2ray")
         testImplementation("org.jetbrains.kotlin:kotlin-test")
         testImplementation("org.mockito:mockito-core:5.0.0")
     }
