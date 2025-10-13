@@ -66,7 +66,7 @@ class TProxyService(
 
             appendLine("misc:")
             appendLine("  read-write-timeout: 300000")
-            appendLine("  log-level: warn")
+            appendLine("  log-level: none")
         }
     }
 

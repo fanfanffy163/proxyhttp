@@ -2,20 +2,6 @@
   "log": {
     "loglevel": "none"
   },
-  "policy":{
-    "levels": {
-      "8": {
-        "handshake": 4,
-        "connIdle": 300,
-        "uplinkOnly": 1,
-        "downlinkOnly": 1
-      }
-    },
-    "system": {
-      "statsOutboundUplink": true,
-      "statsOutboundDownlink": true
-    }
-  },
   "inbounds": [{
     "tag": "socks",
     "port": 10808,
@@ -40,6 +26,40 @@
         "domainStrategy": "UseIP"
       },
       "tag": "direct"
+    },
+    {
+      "protocol": "http",
+      "settings": {
+        "servers": [
+          {
+            "address": "127.0.0.1",
+            "port": 8080
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "raw",
+        "security": "none",
+        "rawSettings": {
+          "acceptProxyProtocol": false,
+          "header": {
+            "type": "none"
+          }
+        }
+      },
+      "tag": "p"
     }
-  ]
+  ],
+  "routing": {
+    "domainStrategy": "AsIs",
+    "domainMatcher": "mph",
+    "rules": [{
+      "type": "field",
+      "protocol": [
+        "http"
+      ],
+      "outboundTag": "p"
+    }],
+    "balancers": []
+  }
 }

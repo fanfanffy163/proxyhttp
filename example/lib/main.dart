@@ -2,11 +2,28 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 
 import 'package:flutter/services.dart';
+import 'package:proxyhttp/http_interceptor.dart';
 import 'package:proxyhttp/httpserver.dart';
 import 'package:proxyhttp/proxyhttp.dart';
+import 'package:http/http.dart' as http;
+import 'package:proxyhttp/socket_to_http_request.dart';
+
+class testHttpInterceptor implements HttpInterceptor {
+  @override
+  Future<bool> onRequest(http.Request request) async {
+    print('请求拦截: ${FlutterProxyServer.extractUnicodeCharacters(HttpParser.serializeRequest(request))} ');
+    return false; // 返回 true 继续处理请求，返回 false 则阻止请求
+  }
+
+  @override
+  Future<bool> onResponse(http.Response response) async {
+    print('响应拦截: ${response.statusCode} ${response.request?.url}');
+    return false; // 返回 true 继续处理响应，返回 false 则阻止响应
+  }
+}
 
 void main() {
-  startLocalServer();
+  FlutterProxyServer().withInterceptor(testHttpInterceptor()).start();
 
   runApp(const MyApp());
 }
