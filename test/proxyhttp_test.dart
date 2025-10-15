@@ -10,6 +10,12 @@ class MockProxyhttpPlatform
 
   @override
   Future<String?> getPlatformVersion() => Future.value('42');
+
+  @override
+  Future<void> startVpn() async {}
+
+  @override
+  Future<void> stopVpn() async {}
 }
 
 void main() {

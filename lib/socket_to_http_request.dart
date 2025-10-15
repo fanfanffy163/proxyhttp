@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -35,7 +34,6 @@ class HttpParser {
       } on FormatException {
         // 最后尝试允许畸形的UTF-8
         headerString = utf8.decode(headerData, allowMalformed: true);
-        print('Warning: Headers contain malformed characters that could not be properly decoded');
       }
     }
 
@@ -71,7 +69,7 @@ class HttpParser {
         throw FormatException('Invalid header format: $line');
       }
       
-      final name = line.substring(0, colonIndex).trim().toLowerCase();
+      final name = line.substring(0, colonIndex).trim();
       final value = line.substring(colonIndex + 1).trim();
       
       // 处理重复的头字段
@@ -94,7 +92,6 @@ class HttpParser {
         
         // 处理实际长度与声明长度不匹配的情况
         if (actualLength < contentLength) {
-          print('Warning: Content-Length mismatch. Expected $contentLength, got $actualLength');
           body = data.sublist(bodyStartIndex);
         } else if (actualLength > contentLength) {
           body = data.sublist(bodyStartIndex, bodyStartIndex + contentLength);
@@ -108,10 +105,10 @@ class HttpParser {
     }
 
     // 处理内容编码
-    final contentEncoding = headers['content-encoding'];
-    if (contentEncoding != null) {
-      body = _decodeBody(body, contentEncoding);
-    }
+    // final contentEncoding = headers['content-encoding'];
+    // if (contentEncoding != null) {
+    //   body = _decodeBody(body, contentEncoding);
+    // }
 
     // 创建请求对象
     final request = http.Request(method, Uri.parse(path));
@@ -127,7 +124,7 @@ class HttpParser {
     request.bodyBytes = body;
     
     // 存储HTTP版本信息
-    request.headers['http-version'] = httpVersion;
+    //request.headers['http-version'] = httpVersion;
     
     return request;
   }
@@ -208,14 +205,12 @@ class HttpParser {
       try {
         return gzip.decode(body) as Uint8List;
       } catch (e) {
-        print('Error decoding gzip body: $e');
         return body; // 解码失败时返回原始数据
       }
     } else if (encoding.contains('deflate')) {
       try {
         return zlib.decode(body) as Uint8List;
       } catch (e) {
-        print('Error decoding deflate body: $e');
         return body; // 解码失败时返回原始数据
       }
     }
@@ -227,7 +222,7 @@ class HttpParser {
   // 将请求对象序列化回字节流以便发送
   static Uint8List serializeRequest(http.Request request) {
     // 自动更新 Content-Length
-    request.headers['content-length'] = request.bodyBytes.length.toString();
+    //request.headers['content-length'] = request.bodyBytes.length.toString();
     // 移除 chunked 编码，因为我们现在是完整发送
     request.headers.remove('transfer-encoding');
 

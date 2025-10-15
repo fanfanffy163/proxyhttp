@@ -6,9 +6,17 @@ buildscript {
     repositories {
         google()
         mavenCentral()
+
+        maven {
+            setUrl("https://jitpack.io")
+            content {
+                includeGroup("com.github.aasitnikov")
+            }
+        }
     }
 
     dependencies {
+        classpath("com.github.aasitnikov:fat-aar-android:1.4.4")
         classpath("com.android.tools.build:gradle:8.9.1")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version")
     }
@@ -18,11 +26,15 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        flatDir{
+            dirs 'libs'
+        }
     }
 }
 
 apply plugin: "com.android.library"
 apply plugin: "kotlin-android"
+apply plugin: 'com.kezong.fat-aar'
 
 android {
     namespace = "com.fan.proxyhttp"
@@ -49,8 +61,7 @@ android {
 
     dependencies {
         // Core Libraries
-        // implementation(fileTree(dir: 'libs', include: ['*.jar', '*.aar']))
-        api project(":localResp:v2ray")
+        embed(name: 'libv2ray', ext: 'aar')
         testImplementation("org.jetbrains.kotlin:kotlin-test")
         testImplementation("org.mockito:mockito-core:5.0.0")
     }

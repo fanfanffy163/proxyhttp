@@ -1,14 +1,7 @@
 package com.fan.proxyhttp.vpn
 
 import android.app.Service
-import android.content.ContentValues.TAG
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
-import android.os.Build
 import android.util.Log
-import androidx.core.content.ContextCompat
-import com.fan.proxyhttp.R
 import com.fan.proxyhttp.util.Utils
 import go.Seq
 import kotlinx.coroutines.CoroutineScope
@@ -36,7 +29,7 @@ object V2RayManager {
      */
     fun startCoreLoop(): Boolean {
         if (coreController.isRunning) {
-            return false
+            return true
         }
 
         val context = getService() ?: return false
@@ -47,10 +40,7 @@ object V2RayManager {
             return false
         }
 
-        if (coreController.isRunning == false) {
-            return false
-        }
-        return true
+        return coreController.isRunning
     }
 
     /**

@@ -8,10 +8,10 @@ import 'package:proxyhttp/proxyhttp.dart';
 import 'package:http/http.dart' as http;
 import 'package:proxyhttp/socket_to_http_request.dart';
 
-class testHttpInterceptor implements HttpInterceptor {
+class TestHttpInterceptor implements HttpInterceptor {
   @override
   Future<bool> onRequest(http.Request request) async {
-    print('请求拦截: ${FlutterProxyServer.extractUnicodeCharacters(HttpParser.serializeRequest(request))} ');
+    print('请求拦截: ${HttpProxyServer.extractUnicodeCharacters(HttpParser.serializeRequest(request))} ');
     return false; // 返回 true 继续处理请求，返回 false 则阻止请求
   }
 
@@ -23,7 +23,7 @@ class testHttpInterceptor implements HttpInterceptor {
 }
 
 void main() {
-  FlutterProxyServer().withInterceptor(testHttpInterceptor()).start();
+  HttpProxyServer().withInterceptor(TestHttpInterceptor()).start();
 
   runApp(const MyApp());
 }

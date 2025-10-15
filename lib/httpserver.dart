@@ -3,38 +3,46 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:logger/logger.dart';
 import 'package:proxyhttp/http_interceptor.dart';
 import 'package:proxyhttp/socket_to_http_request.dart';
 
 enum ProtocolType { http, https, unknown }
 
-class FlutterProxyServer {
+class HttpProxyServer {
   late ServerSocket _server;
   HttpInterceptor? _interceptor;
   final String host; // 本地服务端地址（默认 127.0.0.1）
   final int port;    // 本地服务端端口（默认 8080）
+  final Logger _logger;
 
-  FlutterProxyServer({this.host = '127.0.0.1', this.port = 8080});
+  HttpProxyServer({this.host = '127.0.0.1', this.port = 8080, Level logLevel = Level.info})
+      : _logger = Logger(
+          printer: PrettyPrinter(
+            printEmojis: true,
+          ),
+          level: logLevel,
+        );
 
   // 设置 HTTP 拦截器
-  FlutterProxyServer withInterceptor(HttpInterceptor interceptor) {
-	_interceptor = interceptor;
-	return this;
+  HttpProxyServer withInterceptor(HttpInterceptor interceptor) {
+    _interceptor = interceptor;
+    return this;
   }
 
   // 启动代理服务端
   Future<void> start() async {
     try {
       _server = await ServerSocket.bind(host, port);
-      print('✅ Flutter 本地代理服务端已启动：$host:$port');
+      _logger.i('Flutter 本地代理服务端已启动：$host:$port');
 
       // 监听客户端连接（Xray 会连接这里）
       await for (final Socket clientSocket in _server) {
-        print('\n📥 接收到新连接：${clientSocket.remoteAddress}:${clientSocket.remotePort}');
+        _logger.i('接收到新连接：${clientSocket.remoteAddress}:${clientSocket.remotePort}');
         _handleClient(clientSocket); // 处理单个客户端请求
       }
     } catch (e) {
-      print('❌ 服务端启动失败：$e');
+      _logger.e('服务端启动失败', error: e);
     }
   }
 
@@ -69,7 +77,7 @@ class FlutterProxyServer {
       }
       final requestBytes = requestBuffer.toBytes();
       final requestStr = utf8.decode(requestBytes);
-      print('📤 收到代理请求：\n$requestStr');
+      _logger.i('收到代理请求：\n$requestStr');
 
       // 2. 解析请求头，提取代理关键信息
       final parsed = _parseProxyRequest(requestStr);
@@ -93,8 +101,7 @@ class FlutterProxyServer {
       }
 
     } catch (e, stackTrace) {
-      print('❌ 处理客户端请求失败：$e');
-      print('❌ 堆栈信息：$stackTrace');
+      _logger.e('处理客户端请求失败', error: e, stackTrace: stackTrace);
     } finally {
       // 关闭客户端连接（避免资源泄漏）
       await clientSocket.done;
@@ -151,19 +158,17 @@ class FlutterProxyServer {
   }
 
   // 处理 CONNECT 方法（HTTPS 代理隧道）
-  // 处理 CONNECT 方法（HTTPS 代理隧道）
-	// 处理 CONNECT 方法（HTTPS 代理隧道）
 	Future<void> _handleConnect(Socket clientSocket, Stream<Uint8List> clientSocketBroadcast, String targetHost, int targetPort) async {
 	Socket? targetSocket; // 声明为可空，以便在 catch 和 finally 中使用
 
 	try {
 		// 1. 连接目标服务器（如 example.com:443）
 		targetSocket = await Socket.connect(targetHost, targetPort);
-		print('✅ 已连接目标服务器：$targetHost:$targetPort');
+		_logger.i('已连接目标服务器：$targetHost:$targetPort');
 
 		// 3. 建立双向数据转发：Xray ↔ 目标服务器
 		// 这是正确且可靠的方式
-		bool _clientClosed = false;
+		bool clientClosed = false;
 		final BytesBuilder requestBuffer = BytesBuilder();
 		clientSocketBroadcast.listen(
 			(data) async{
@@ -177,42 +182,41 @@ class FlutterProxyServer {
 					requestBuffer.add(data);
 					final parseRes = HttpParser.fromUint8List(requestBuffer.toBytes());
 					if(!parseRes.isChunked && !await _interceptor!.onRequest(parseRes.request!)){
-						targetSocket?.add(requestBuffer.toBytes());
+						targetSocket?.add(HttpParser.serializeRequest(parseRes.request!));
+            requestBuffer.clear();
 					}
 				}catch(e,stackTrace){
-					print('❌ Xray ↔ 目标服务器 转发错误：$e');
-					print('❌ 堆栈信息：$stackTrace');
+					_logger.e('Xray ↔ 目标服务器 转发错误', error: e, stackTrace: stackTrace);
 				}
 				
 			},
 			onError: (e) {
-				print('❌ Xray → 目标服务器转发错误：$e');
+				_logger.e('Xray → 目标服务器转发错误,',error: e);
 				targetSocket?.destroy(); // 出错时销毁对方 socket
-				_clientClosed = true;
+				clientClosed = true;
 			},
 			onDone: () async {
 				await targetSocket?.close();
-				_clientClosed = true;
+				clientClosed = true;
 			}  // 一方关闭后，关闭另一方
 		);
 
 		targetSocket.listen(
 			(data) {
 				try{
-					if(!_clientClosed){
+					if(!clientClosed){
 						clientSocket.add(data);
 					}
 				}catch(e,stackTrace){
-					print('❌ 目标服务器 → Xray 转发错误：$e');
-					print('❌ 堆栈信息：$stackTrace');
+					_logger.e('目标服务器 → Xray 转发错误', error: e, stackTrace: stackTrace);
 				}
 			},
 			onError: (e) {
-				print('❌ 目标服务器 → Xray 转发错误：$e');
+				_logger.e('目标服务器 → Xray 转发错误',error: e);
 				clientSocket.destroy(); // 出错时销毁对方 socket
 			},
 			onDone: () async {
-				if(!_clientClosed){
+				if(!clientClosed){
 					await clientSocket.close(); // 一方关闭后，关闭另一方
 				}
 			}
@@ -242,7 +246,7 @@ class FlutterProxyServer {
 	try {
 		// 1. 连接目标服务器
 		final targetSocket = await Socket.connect(targetHost, targetPort);
-		print('✅ 已连接目标服务器：$targetHost:$targetPort');
+		_logger.i('已连接目标服务器：$targetHost:$targetPort');
 
 		// 2. 向目标服务器发送重组后的请求头
 		targetSocket.write(requestHeader);
@@ -272,7 +276,7 @@ class FlutterProxyServer {
 		if (bodyIndex != -1 && bodyIndex < requestBytes.length) {
 			final requestBody = requestBytes.sublist(bodyIndex);
 			if (requestBody.isNotEmpty) {
-				print('Forwarding HTTP body of length: ${requestBody.length}');
+				_logger.i('Forwarding HTTP body of length: ${requestBody.length}');
 				targetSocket.add(requestBody);
 			}
 		}
@@ -304,13 +308,13 @@ class FlutterProxyServer {
     $message\r\n''';
     clientSocket.write(response);
     clientSocket.flush();
-    print('❌ 发送错误响应：$status - $message');
+    _logger.i('发送错误响应：$status - $message');
   }
 
   // 停止代理服务端
   Future<void> stop() async {
     await _server.close();
-    print('🛑 Flutter 本地代理服务端已停止');
+    _logger.i('Flutter 本地代理服务端已停止');
   }
 
   // 判断协议类型
