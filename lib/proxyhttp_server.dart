@@ -168,7 +168,6 @@ class HttpProxyServer {
 
 		// 3. 建立双向数据转发：Xray ↔ 目标服务器
 		// 这是正确且可靠的方式
-		bool clientClosed = false;
 		final BytesBuilder requestBuffer = BytesBuilder();
 		clientSocketBroadcast.listen(
 			(data) async{
@@ -180,7 +179,7 @@ class HttpProxyServer {
 					}
 
 					requestBuffer.add(data);
-					final parseRes = HttpParser.fromUint8List(requestBuffer.toBytes());
+					final parseRes = HttpParser.fromUint8ListToRequest(requestBuffer.toBytes());
 					if(!parseRes.isChunked && !await _interceptor!.onRequest(parseRes.request!)){
 						targetSocket?.add(HttpParser.serializeRequest(parseRes.request!));
             requestBuffer.clear();
@@ -193,19 +192,26 @@ class HttpProxyServer {
 			onError: (e) {
 				_logger.e('Xray → 目标服务器转发错误,',error: e);
 				targetSocket?.destroy(); // 出错时销毁对方 socket
-				clientClosed = true;
 			},
 			onDone: () async {
 				await targetSocket?.close();
-				clientClosed = true;
 			}  // 一方关闭后，关闭另一方
 		);
 
+    final BytesBuilder responseBuffer = BytesBuilder();
 		targetSocket.listen(
-			(data) {
+			(data) async{
 				try{
-					if(!clientClosed){
+          if(_interceptor == null){
 						clientSocket.add(data);
+						return;
+					}
+
+					responseBuffer.add(data);       
+					final parseRes = HttpParser.fromUint8ListToResponse(responseBuffer.toBytes());
+					if(!parseRes.isChunked && !await _interceptor!.onResponse(parseRes.response!)){
+						clientSocket.add(HttpParser.serializeResponse(parseRes.response!));
+            responseBuffer.clear();
 					}
 				}catch(e,stackTrace){
 					_logger.e('目标服务器 → Xray 转发错误', error: e, stackTrace: stackTrace);
@@ -216,9 +222,7 @@ class HttpProxyServer {
 				clientSocket.destroy(); // 出错时销毁对方 socket
 			},
 			onDone: () async {
-				if(!clientClosed){
-					await clientSocket.close(); // 一方关闭后，关闭另一方
-				}
+				await clientSocket.close(); // 一方关闭后，关闭另一方
 			}
 		);
 
