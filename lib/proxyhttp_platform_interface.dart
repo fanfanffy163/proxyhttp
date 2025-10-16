@@ -23,11 +23,11 @@ abstract class ProxyhttpPlatform extends PlatformInterface {
     _instance = instance;
   }
 
-  Future<String?> getPlatformVersion() {
+  Future<String?> getCoreVersion() {
     throw UnimplementedError('platformVersion() has not been implemented.');
   }
 
-  Future<void> startVpn() async {}
+  Future<void> startVpn({String proxyHost = "127.0.0.1",int proxyPort = 9090}) async {}
 
   Future<void> stopVpn() async {}
 }

@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.os.StrictMode
 import android.util.Log
+import com.fan.proxyhttp.util.Utils
 import java.lang.ref.SoftReference
 
 class ProxyHttpVpn : VpnService(), ServiceControl {
@@ -20,14 +21,11 @@ class ProxyHttpVpn : VpnService(), ServiceControl {
 
     companion object {
 
-        var proxyHost = "127.0.0.1"
-        var proxyPort = 9090
+        private var proxyHost = "127.0.0.1"
+        private var proxyPort = 9090
+        private var socks5Port = 10808
 
         const val VPN_START_CODE = 1001;
-
-        const val PROXY_HOST_KEY = "proxy_host";
-
-        const val PROXY_PORT_KEY = "proxy_port";
 
         const val ACTION_DISCONNECT = "DISCONNECT"
         const val ACTION_CONNECT = "CONNECT"
@@ -36,6 +34,9 @@ class ProxyHttpVpn : VpnService(), ServiceControl {
 
         const val VIRTUAL_HOST = "10.0.0.2"
 
+        fun getSock5Port() : Int { return socks5Port }
+        fun getProxyHost() : String { return proxyHost }
+        fun getProxyPort() : Int { return proxyPort }
 
         fun startVpn(
             context: Activity,
@@ -43,9 +44,9 @@ class ProxyHttpVpn : VpnService(), ServiceControl {
             port : Int?,
         ): Boolean {
             val intent = prepare(context)
+            proxyHost = host ?: proxyHost;
+            proxyPort = port ?: proxyPort;
             if(intent != null){
-                proxyHost = host ?: proxyHost;
-                proxyPort = port ?: proxyPort;
                 context.startActivityForResult(intent, VPN_START_CODE);
             }else{
                 context.startService(startVpnIntent(context));
@@ -68,8 +69,6 @@ class ProxyHttpVpn : VpnService(), ServiceControl {
         ): Intent {
             return Intent(context, ProxyHttpVpn::class.java).also {
                 it.action = ACTION_CONNECT
-                it.putExtra(PROXY_HOST_KEY, proxyHost)
-                it.putExtra(PROXY_PORT_KEY, proxyPort)
             }
         }
     }
@@ -87,12 +86,11 @@ class ProxyHttpVpn : VpnService(), ServiceControl {
                 disconnect()
             }
 
+            seekFreeSock5Port()
             if(!V2RayManager.startCoreLoop()){
                 return START_NOT_STICKY
             }
 
-            val proxyHost = intent.getStringExtra(PROXY_HOST_KEY) ?: "127.0.0.1";
-            val proxyPort = intent.getIntExtra(PROXY_PORT_KEY, 9099)
             connect(proxyHost, proxyPort)
             START_REDELIVER_INTENT
         }
@@ -125,8 +123,16 @@ class ProxyHttpVpn : VpnService(), ServiceControl {
             }
         }.establish()!!
 
-        runTun2socks()
         isRunning = true;
+        runTun2socks()
+    }
+
+    private fun seekFreeSock5Port(){
+        val portList = mutableListOf<Int>()
+        for (tmpPort in 10808..10808+100) {
+            portList.add(tmpPort)
+        }
+        socks5Port = Utils.findFreePort(portList)
     }
 
     /**

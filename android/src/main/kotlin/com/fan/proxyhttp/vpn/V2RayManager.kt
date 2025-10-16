@@ -2,7 +2,9 @@ package com.fan.proxyhttp.vpn
 
 import android.app.Service
 import android.util.Log
+import com.fan.proxyhttp.util.JsonUtil
 import com.fan.proxyhttp.util.Utils
+import com.fan.proxyhttp.vpn.V2rayConfig.OutboundBean.OutSettingsBean.ServersBean
 import go.Seq
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -24,6 +26,10 @@ object V2RayManager {
             Libv2ray.initCoreEnv(Utils.userAssetPath(value?.get()?.getService()), Utils.getDeviceIdForXUDPBaseKey())
         }
 
+    fun getCoreVersion(): String{
+        return Libv2ray.checkVersionX()
+    }
+
     /**
      * Starts the V2Ray core service.
      */
@@ -34,7 +40,22 @@ object V2RayManager {
 
         val context = getService() ?: return false
         try {
-            coreController.startLoop(Utils.readTextFromAssets(context,"v2ray_config.json"))
+            val config = Utils.readTextFromAssets(context, "v2ray_config.json")
+            val v2rayConfig = JsonUtil.fromJson(config, V2rayConfig::class.java)
+
+            //proxy port
+            val outboundBean = v2rayConfig.getProxyOutboundByProtocol("http")
+            val serversBean = ServersBean(address = ProxyHttpVpn.getProxyHost(), port = ProxyHttpVpn.getProxyPort())
+            val serversBeanList = mutableListOf<ServersBean>()
+            serversBeanList.add(serversBean)
+            outboundBean?.settings?.servers = ArrayList(serversBeanList)
+
+            //tun2sock5 port
+            val inboundBean = v2rayConfig.inbounds[0]
+            inboundBean.port = ProxyHttpVpn.getSock5Port()
+
+            var cfg = JsonUtil.toJsonPretty(v2rayConfig)
+            coreController.startLoop(cfg)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start Core loop", e)
             return false

@@ -9,10 +9,10 @@ class MockProxyhttpPlatform
     implements ProxyhttpPlatform {
 
   @override
-  Future<String?> getPlatformVersion() => Future.value('42');
+  Future<String?> getCoreVersion() => Future.value('42');
 
   @override
-  Future<void> startVpn() async {}
+  Future<void> startVpn({String proxyHost = "127.0.0.1",int proxyPort = 9090}) async {}
 
   @override
   Future<void> stopVpn() async {}
@@ -30,6 +30,6 @@ void main() {
     MockProxyhttpPlatform fakePlatform = MockProxyhttpPlatform();
     ProxyhttpPlatform.instance = fakePlatform;
 
-    expect(await proxyhttpPlugin.getPlatformVersion(), '42');
+    expect(await proxyhttpPlugin.getCoreVersion(), '42');
   });
 }

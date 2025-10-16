@@ -10,14 +10,17 @@ class MethodChannelProxyhttp extends ProxyhttpPlatform {
   final methodChannel = const MethodChannel('proxyhttp');
 
   @override
-  Future<String?> getPlatformVersion() async {
-    final version = await methodChannel.invokeMethod<String>('getPlatformVersion');
+  Future<String?> getCoreVersion() async {
+    final version = await methodChannel.invokeMethod<String>('getCoreVersion');
     return version;
   }
 
   @override
-  Future<void> startVpn() async {
-    await methodChannel.invokeMethod('startVpn');
+  Future<void> startVpn({String proxyHost = "127.0.0.1",int proxyPort = 9090}) async {
+    await methodChannel.invokeMethod('startVpn',<String, dynamic>{
+      "proxyHost":proxyHost,
+      "proxyPort":proxyPort
+      });
   }
 
   @override

@@ -6,7 +6,6 @@ import 'package:proxyhttp/http_interceptor.dart';
 import 'package:proxyhttp/proxyhttp_server.dart';
 import 'package:proxyhttp/proxyhttp.dart';
 import 'package:http/http.dart' as http;
-import 'package:proxyhttp/socket_to_http_request.dart';
 
 class TestHttpInterceptor implements HttpInterceptor {
   @override
@@ -23,8 +22,6 @@ class TestHttpInterceptor implements HttpInterceptor {
 }
 
 void main() {
-  HttpProxyServer().withInterceptor(TestHttpInterceptor()).start();
-
   runApp(const MyApp());
 }
 
@@ -36,25 +33,27 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  String _platformVersion = 'Unknown';
+  String _coreVersion = 'Unknown';
+  int _serverPort = -1;
   final _proxyhttpPlugin = Proxyhttp();
+  late HttpProxyServer _server;
 
   @override
-  void initState() {
+  void initState(){
     super.initState();
     initPlatformState();
   }
 
   // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> initPlatformState() async {
-    String platformVersion;
+    String coreVersion;
     // Platform messages may fail, so we use a try/catch PlatformException.
     // We also handle the message potentially returning null.
     try {
-      platformVersion =
-          await _proxyhttpPlugin.getPlatformVersion() ?? 'Unknown platform version';
+      coreVersion =
+          await _proxyhttpPlugin.getCoreVersion() ?? 'Unknown core version';
     } on PlatformException {
-      platformVersion = 'Failed to get platform version.';
+      coreVersion = 'Failed to get core version.';
     }
 
     // If the widget was removed from the tree while the asynchronous platform
@@ -63,7 +62,13 @@ class _MyAppState extends State<MyApp> {
     if (!mounted) return;
 
     setState(() {
-      _platformVersion = platformVersion;
+      _coreVersion = coreVersion;
+    });
+
+    _server = HttpProxyServer(port: "9000-9003").withInterceptor(TestHttpInterceptor());
+    await _server.start();
+    setState(() {
+      _serverPort = _server.getRunningPort();
     });
   }
 
@@ -77,11 +82,14 @@ class _MyAppState extends State<MyApp> {
         body: Column(
           children: [
             Center(
-              child: Text('Running on: $_platformVersion\n'),
+              child: Text('Running on: $_coreVersion\n'),
+            ),
+            Center(
+              child: Text('Server running on port: ${_server.getRunningPort()}\n'),
             ),
             ElevatedButton(
               onPressed: () {
-                _proxyhttpPlugin.startVpn();
+                _proxyhttpPlugin.startVpn(proxyPort: _server.getRunningPort());
               },
               child: const Text('Start VPN'),
             ),

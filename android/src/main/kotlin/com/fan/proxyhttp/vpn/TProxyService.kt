@@ -3,7 +3,6 @@ package com.fan.proxyhttp.vpn
 import android.content.Context
 import android.os.ParcelFileDescriptor
 import android.util.Log
-import go.error
 import java.io.File
 
 /**
@@ -60,7 +59,7 @@ class TProxyService(
             appendLine("  ipv4: ${ProxyHttpVpn.VIRTUAL_HOST}")
 
             appendLine("socks5:")
-            appendLine("  port: 10808")
+            appendLine("  port: ${ProxyHttpVpn.getSock5Port()}")
             appendLine("  address: 127.0.0.1")
             appendLine("  udp: 'udp'")
 

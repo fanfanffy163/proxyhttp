@@ -1,23 +1,26 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:logger/logger.dart';
 import 'package:proxyhttp/http_interceptor.dart';
 import 'package:proxyhttp/socket_to_http_request.dart';
+import 'package:proxyhttp/utils.dart';
 
 enum ProtocolType { http, https, unknown }
 
 class HttpProxyServer {
   late ServerSocket _server;
   HttpInterceptor? _interceptor;
-  final String host; // 本地服务端地址（默认 127.0.0.1）
-  final int port;    // 本地服务端端口（默认 8080）
+  final String _host; // 本地服务端地址（默认 127.0.0.1）
+  Object _port;    // 本地服务端端口（默认 8080）
   final Logger _logger;
+  bool _isRunning = false;
 
-  HttpProxyServer({this.host = '127.0.0.1', this.port = 8080, Level logLevel = Level.info})
-      : _logger = Logger(
+  HttpProxyServer({String host = '127.0.0.1', Object port = 8080, Level logLevel = Level.info})
+      : _port = port, _host = host, _logger = Logger(
           printer: PrettyPrinter(
             printEmojis: true,
           ),
@@ -33,21 +36,55 @@ class HttpProxyServer {
   // 启动代理服务端
   Future<void> start() async {
     try {
-      _server = await ServerSocket.bind(host, port);
-      _logger.i('Flutter 本地代理服务端已启动：$host:$port');
-
-      // 监听客户端连接（Xray 会连接这里）
-      await for (final Socket clientSocket in _server) {
-        _logger.i('接收到新连接：${clientSocket.remoteAddress}:${clientSocket.remotePort}');
-        _handleClient(clientSocket); // 处理单个客户端请求
+      if(_port is int){
+      }else if(_port is String){
+        final portList = (_port as String).split('-').map((e) => int.tryParse(e.trim())).whereType<int>().toList();
+        if(portList.length != 2){
+          throw ArgumentError('Port must be an int or a String[e.g. 8001-8003]');
+        }
+        final leastPort = min(portList[0], portList[1]);
+        final maxPort = max(portList[0], portList[1]);
+        for(int tmpPort= leastPort; tmpPort <= maxPort; tmpPort++){
+          if(!await Utils.isPortInUse(tmpPort, address: _host)){
+            _port = tmpPort;
+            break;
+          }
+        }
+      }else{
+        throw ArgumentError('Port must be an int or a String[e.g. 8001-8003]');
       }
+      _server = await ServerSocket.bind(_host, _port as int);
+      _isRunning = true; 
+      _logger.i('代理服务端已启动：$_host:$_port');      
     } catch (e) {
       _logger.e('服务端启动失败', error: e);
+      rethrow;
+    }
+
+    // 监听客户端连接（Xray 会连接这里）
+    await for (final Socket clientSocket in _server) {
+      _logger.i('接收到新连接：${clientSocket.remoteAddress}:${clientSocket.remotePort}');
+      _handleClient(clientSocket); // 处理单个客户端请求
     }
   }
 
+  // 停止代理服务端
+  Future<void> stop() async {
+    if(!_isRunning) return;
+
+    await _server.close();
+    _isRunning = false;
+    _logger.i('Flutter 本地代理服务端已停止');
+  }
+
+  // 获取服务正在运行的端口，未运行则为-1
+  int getRunningPort(){
+    if(!_isRunning) return -1;
+    return _port as int;
+  }
+
   // 辅助函数：比较两个字节数组是否相等（用于检测结束标志）
-  bool bytesAreEqual(Uint8List a, Uint8List b) {
+  bool _bytesAreEqual(Uint8List a, Uint8List b) {
     if (a.length != b.length) return false;
     for (int i = 0; i < a.length; i++) {
       if (a[i] != b[i]) return false;
@@ -70,7 +107,7 @@ class HttpProxyServer {
         if (buffer.length >= 4) {
           // 取最后4个字节（\r\n\r\n 共4个字节）
           final last4Bytes = buffer.sublist(buffer.length - 4);
-          if (bytesAreEqual(last4Bytes, utf8.encode('\r\n\r\n'))) {
+          if (_bytesAreEqual(last4Bytes, utf8.encode('\r\n\r\n'))) {
             break; // 检测到完整结束标志，退出循环
           }
         }
@@ -167,7 +204,6 @@ class HttpProxyServer {
 		_logger.i('已连接目标服务器：$targetHost:$targetPort');
 
 		// 3. 建立双向数据转发：Xray ↔ 目标服务器
-		// 这是正确且可靠的方式
 		final BytesBuilder requestBuffer = BytesBuilder();
 		clientSocketBroadcast.listen(
 			(data) async{
@@ -315,51 +351,45 @@ class HttpProxyServer {
     _logger.i('发送错误响应：$status - $message');
   }
 
-  // 停止代理服务端
-  Future<void> stop() async {
-    await _server.close();
-    _logger.i('Flutter 本地代理服务端已停止');
-  }
+  // // 判断协议类型
+  // ProtocolType _detectProtocol(Uint8List data) {
+  //   // 根据数据特征判断
+  //   if (data.isEmpty) {
+  //     return ProtocolType.unknown;
+  //   }
 
-  // 判断协议类型
-  static ProtocolType detectProtocol(Uint8List data) {
-    // 根据数据特征判断
-    if (data.isEmpty) {
-      return ProtocolType.unknown;
-    }
+  //   // 检查是否可能是HTTPS的TLS握手
+  //   // TLS握手通常以0x16开始
+  //   if (data[0] == 0x16) {
+  //     return ProtocolType.https;
+  //   }
 
-    // 检查是否可能是HTTPS的TLS握手
-    // TLS握手通常以0x16开始
-    if (data[0] == 0x16) {
-      return ProtocolType.https;
-    }
-
-    // 检查是否是HTTP明文（以常见HTTP方法开头）
-    String startStr;
-    try {
-      // 尝试将前几个字节转换为字符串
-      startStr = utf8.decode(data.sublist(0, data.length < 10 ? data.length : 10));
+  //   // 检查是否是HTTP明文（以常见HTTP方法开头）
+  //   String startStr;
+  //   try {
+  //     // 尝试将前几个字节转换为字符串
+  //     startStr = utf8.decode(data.sublist(0, data.length < 10 ? data.length : 10));
       
-      // 常见的HTTP方法
-      const httpMethods = ['GET', 'POST', 'PUT', 'DELETE', 'HEAD', 'OPTIONS', 'PATCH'];
-      for (var method in httpMethods) {
-        if (startStr.startsWith(method)) {
-          return ProtocolType.http;
-        }
-      }
-    } catch (e) {
-      // 无法转换为字符串，可能是二进制数据（HTTPS）
-      return ProtocolType.https;
-    }
+  //     // 常见的HTTP方法
+  //     const httpMethods = ['GET', 'POST', 'PUT', 'DELETE', 'HEAD', 'OPTIONS', 'PATCH'];
+  //     for (var method in httpMethods) {
+  //       if (startStr.startsWith(method)) {
+  //         return ProtocolType.http;
+  //       }
+  //     }
+  //   } catch (e) {
+  //     // 无法转换为字符串，可能是二进制数据（HTTPS）
+  //     return ProtocolType.https;
+  //   }
 
-    return ProtocolType.unknown;
-  }
+  //   return ProtocolType.unknown;
+  // }
 
-  // 从字节数据中提取Unicode字符（UTF-8）
-	static String extractUnicodeCharacters(Uint8List data) {
-	// 使用允许畸形字节的UTF-8解码器
-	// 无效字节会被替换为 �（Unicode替换字符 U+FFFD）
-	final decoder = Utf8Decoder(allowMalformed: true);
-	return decoder.convert(data);
+  // // 从字节数据中提取Unicode字符（UTF-8）
+	static String _extractUnicodeCharacters(Uint8List data) {
+    // 使用允许畸形字节的UTF-8解码器
+    // 无效字节会被替换为 �（Unicode替换字符 U+FFFD）
+    final decoder = Utf8Decoder(allowMalformed: true);
+    return decoder.convert(data);
 	}
 }

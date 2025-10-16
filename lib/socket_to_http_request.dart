@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import 'package:proxyhttp/utils.dart';
 
 class HttpParseRes{
   http.Request? request;
@@ -156,7 +157,7 @@ class HttpParser {
 
     // 解析状态行 (格式: HTTP/version statusCode reasonPhrase)
     final statusLine = headerLines[0];
-    final statusLineParts = statusLine.split(' '); // 最多分成3部分，避免原因短语包含空格
+    final statusLineParts = Utils.splitUntil(statusLine, ' ', maxParts: 3); // 最多分成3部分，避免原因短语包含空格
     if (statusLineParts.length < 2) {
       throw FormatException('Invalid status line format: $statusLine');
     }

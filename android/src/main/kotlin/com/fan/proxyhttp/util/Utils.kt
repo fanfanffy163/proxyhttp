@@ -4,6 +4,8 @@ import android.content.Context
 import android.provider.Settings
 import android.util.Base64
 import android.util.Log
+import java.io.IOException
+import java.net.ServerSocket
 
 object Utils {
     private val TAG = "app utils";
@@ -62,6 +64,26 @@ object Utils {
             Log.e(TAG, "Failed to read asset file: $fileName", e)
             ""
         }
+    }
+
+    /**
+     * Find a free port from a list of ports.
+     *
+     * @param ports The list of ports to check.
+     * @return The first free port found.
+     * @throws IOException If no free port is found.
+     */
+    fun findFreePort(ports: List<Int>): Int {
+        for (port in ports) {
+            try {
+                return ServerSocket(port).use { it.localPort }
+            } catch (ex: IOException) {
+                continue  // try next port
+            }
+        }
+
+        // if the program gets here, no port in the range was found
+        throw IOException("no free port found")
     }
 
 }

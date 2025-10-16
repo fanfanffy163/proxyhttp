@@ -1,6 +1,8 @@
 package com.fan.proxyhttp
 
+import android.R
 import com.fan.proxyhttp.vpn.ProxyHttpVpn
+import com.fan.proxyhttp.vpn.V2RayManager
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -28,8 +30,8 @@ class ProxyhttpPlugin :
         result: Result
     ) {
         when(call.method){
-            "getPlatformVersion" ->{
-                result.success("Android ${android.os.Build.VERSION.RELEASE}")
+            "getCoreVersion" ->{
+                result.success(V2RayManager.getCoreVersion())
             }
             "startVpn" -> {
                 val host = call.argument<String>("proxyHost")
