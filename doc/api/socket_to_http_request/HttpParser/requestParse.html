@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
+  <meta name="description" content="API docs for the requestParse method from the HttpParser class, for the Dart programming language.">
+  <title>requestParse method - HttpParser class - socket_to_http_request library - Dart API</title>
+
+
+  
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  
+  <link rel="stylesheet" href="../../static-assets/github.css?v1">
+  <link rel="stylesheet" href="../../static-assets/styles.css?v1">
+  <link rel="icon" href="../../static-assets/favicon.png?v1">
+  
+</head>
+
+<body data-base-href="../../" data-using-base-href="false" class="light-theme">
+<div id="overlay-under-drawer"></div>
+<header id="title">
+  <span id="sidenav-left-toggle" class="material-symbols-outlined" role="button" tabindex="0">menu</span>
+  <ol class="breadcrumbs gt-separated dark hidden-xs">
+    <li><a href="../../index.html">proxyhttp</a></li>
+    <li><a href="../../socket_to_http_request/">socket_to_http_request.dart</a></li>
+    <li><a href="../../socket_to_http_request/HttpParser-class.html">HttpParser</a></li>
+    <li class="self-crumb">requestParse static method</li>
+  </ol>
+  <div class="self-name">requestParse</div>
+  <form class="search navbar-right" role="search">
+    <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+  <button class="toggle" id="theme-button" title="Toggle between light and dark mode" aria-label="Light and dark mode toggle">
+    <span id="dark-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      dark_mode
+    </span>
+    <span id="light-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      light_mode
+    </span>
+  </button>
+</header>
+<main>
+<div
+    id="dartdoc-main-content"
+    class="main-content"
+    data-above-sidebar="socket_to_http_request&#47;HttpParser-class-sidebar.html"
+    data-below-sidebar="">
+    <div>
+<h1><span class="kind-method">requestParse</span> static method 
+</h1></div>
+
+    <section class="multi-line-signature">
+      
+<span class="returntype"><a href="https://pub.dev/documentation/http/1.5.0/http/Request-class.html">Request</a></span>
+<span class="name ">requestParse</span>(<wbr><ol class="parameter-list single-line"> <li><span class="parameter" id="requestParse-param-data"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-typed_data/Uint8List-class.html">Uint8List</a></span> <span class="parameter-name">data</span></span></li>
+</ol>)
+
+      
+
+    </section>
+    
+<section class="desc markdown">
+  <p>将原始Socket字节数据解析为http.Request对象</p>
+</section>
+
+
+    
+<section class="summary source-code" id="source">
+  <h2><span>Implementation</span></h2>
+  <pre class="language-dart"><code class="language-dart">static http.Request requestParse(Uint8List data) {
+  &#47;&#47; 解析请求头（必须是文本）和请求体（可能是二进制）
+  final headerEndIndex = _findHeaderEnd(data);
+
+  if (headerEndIndex == -1) {
+    throw FormatException(&#39;Could not find end of HTTP headers&#39;);
+  }
+
+  &#47;&#47; 提取并解析请求头（只处理这部分的编码）
+  final headerData = data.sublist(0, headerEndIndex);
+  String headerString;
+
+  &#47;&#47; 更健壮的编码检测和处理
+  try {
+    &#47;&#47; 尝试UTF-8
+    headerString = utf8.decode(headerData, allowMalformed: false);
+  } on FormatException {
+    try {
+      &#47;&#47; 尝试Latin-1 (ISO-8859-1)
+      headerString = latin1.decode(headerData);
+    } on FormatException {
+      &#47;&#47; 最后尝试允许畸形的UTF-8
+      headerString = utf8.decode(headerData, allowMalformed: true);
+    }
+  }
+
+  &#47;&#47; 解析请求行和头字段
+  final headerLines = headerString.split(&#39;\r\n&#39;);
+  if (headerLines.isEmpty) {
+    throw FormatException(&#39;Missing request line in HTTP request&#39;);
+  }
+
+  &#47;&#47; 解析请求行
+  final requestLine = headerLines[0];
+  final requestLineParts = requestLine.split(&#39; &#39;);
+  if (requestLineParts.length != 3) {
+    throw FormatException(&#39;Invalid request line format: $requestLine&#39;);
+  }
+
+  final method = requestLineParts[0];
+  final path = requestLineParts[1];
+  final httpVersion = requestLineParts[2];
+
+  if (!httpVersion.startsWith(&#39;HTTP&#47;&#39;)) {
+    throw FormatException(&#39;Invalid HTTP version: $httpVersion&#39;);
+  }
+
+  &#47;&#47; 解析请求头
+  final headers = &lt;String, String&gt;{};
+  for (int i = 1; i &lt; headerLines.length; i++) {
+    final line = headerLines[i];
+    if (line.isEmpty) continue;
+
+    final colonIndex = line.indexOf(&#39;:&#39;);
+    if (colonIndex == -1) {
+      throw FormatException(&#39;Invalid header format: $line&#39;);
+    }
+
+    final name = line.substring(0, colonIndex).trim().toLowerCase();
+    final value = line.substring(colonIndex + 1).trim();
+
+    &#47;&#47; 处理重复的头字段
+    if (headers.containsKey(name)) {
+      headers[name] = &#39;${headers[name]}, $value&#39;;
+    } else {
+      headers[name] = value;
+    }
+  }
+
+  &#47;&#47; 处理请求体（直接使用原始字节，避免编码转换问题）
+  Uint8List body = Uint8List(0);
+  final bodyStartIndex = headerEndIndex + 4; &#47;&#47; 跳过\r\n\r\n
+  if (bodyStartIndex &lt; data.length) {
+    &#47;&#47; 根据Content-Length验证体长度
+    final contentLengthStr = headers[&#39;content-length&#39;];
+    if (contentLengthStr != null) {
+      final contentLength = int.tryParse(contentLengthStr) ?? 0;
+      final actualLength = data.length - bodyStartIndex;
+
+      &#47;&#47; 处理实际长度与声明长度不匹配的情况
+      if (actualLength &lt; contentLength) {
+        body = data.sublist(bodyStartIndex);
+      } else if (actualLength &gt; contentLength) {
+        body = data.sublist(bodyStartIndex, bodyStartIndex + contentLength);
+      } else {
+        body = data.sublist(bodyStartIndex);
+      }
+    } else {
+      &#47;&#47; 没有Content-Length时，使用所有剩余数据
+      body = data.sublist(bodyStartIndex);
+    }
+  }
+
+  &#47;&#47; 创建请求对象
+  final request = http.Request(method, Uri.parse(path));
+
+  &#47;&#47; 设置请求头
+  headers.forEach((key, value) {
+    request.headers[key] = value;
+  });
+
+  &#47;&#47; 设置请求体
+  request.bodyBytes = body;
+
+  &#47;&#47; 存储HTTP版本信息
+  &#47;&#47;request.headers[&#39;http-version&#39;] = httpVersion;
+
+  return request;
+}</code></pre>
+</section>
+
+
+  </div> <!-- /.main-content -->
+  <div id="dartdoc-sidebar-left" class="sidebar sidebar-offcanvas-left">
+    <!-- The search input and breadcrumbs below are only responsively visible at low resolutions. -->
+<header id="header-search-sidebar" class="hidden-l">
+  <form class="search-sidebar" role="search">
+    <input type="text" id="search-sidebar" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+</header>
+<ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
+    <li><a href="../../index.html">proxyhttp</a></li>
+    <li><a href="../../socket_to_http_request/">socket_to_http_request</a></li>
+    <li><a href="../../socket_to_http_request/HttpParser-class.html">HttpParser</a></li>
+    <li class="self-crumb">requestParse static method</li>
+</ol>
+
+    <h5>HttpParser class</h5>
+    <div id="dartdoc-sidebar-left-content"></div>
+  </div><!--/.sidebar-offcanvas-->
+  <div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
+</div><!--/.sidebar-offcanvas-->
+</main>
+<footer>
+  <span class="no-break">
+    proxyhttp
+      0.0.1
+  </span>
+  
+</footer>
+
+
+<script src="../../static-assets/highlight.pack.js?v1"></script>
+<script src="../../static-assets/docs.dart.js"></script>
+
+</body>
+</html>
+

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
+  <meta name="description" content="API docs for the fromUint8ListToResponse method from the HttpParser class, for the Dart programming language.">
+  <title>fromUint8ListToResponse method - HttpParser class - socket_to_http_request library - Dart API</title>
+
+
+  
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  
+  <link rel="stylesheet" href="../../static-assets/github.css?v1">
+  <link rel="stylesheet" href="../../static-assets/styles.css?v1">
+  <link rel="icon" href="../../static-assets/favicon.png?v1">
+  
+</head>
+
+<body data-base-href="../../" data-using-base-href="false" class="light-theme">
+<div id="overlay-under-drawer"></div>
+<header id="title">
+  <span id="sidenav-left-toggle" class="material-symbols-outlined" role="button" tabindex="0">menu</span>
+  <ol class="breadcrumbs gt-separated dark hidden-xs">
+    <li><a href="../../index.html">proxyhttp</a></li>
+    <li><a href="../../socket_to_http_request/">socket_to_http_request.dart</a></li>
+    <li><a href="../../socket_to_http_request/HttpParser-class.html">HttpParser</a></li>
+    <li class="self-crumb">fromUint8ListToResponse static method</li>
+  </ol>
+  <div class="self-name">fromUint8ListToResponse</div>
+  <form class="search navbar-right" role="search">
+    <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+  <button class="toggle" id="theme-button" title="Toggle between light and dark mode" aria-label="Light and dark mode toggle">
+    <span id="dark-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      dark_mode
+    </span>
+    <span id="light-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      light_mode
+    </span>
+  </button>
+</header>
+<main>
+<div
+    id="dartdoc-main-content"
+    class="main-content"
+    data-above-sidebar="socket_to_http_request&#47;HttpParser-class-sidebar.html"
+    data-below-sidebar="">
+    <div>
+<h1><span class="kind-method">fromUint8ListToResponse</span> static method 
+</h1></div>
+
+    <section class="multi-line-signature">
+      
+<span class="returntype"><a href="../../socket_to_http_request/HttpParseRes-class.html">HttpParseRes</a></span>
+<span class="name ">fromUint8ListToResponse</span>(<wbr><ol class="parameter-list single-line"> <li><span class="parameter" id="fromUint8ListToResponse-param-data"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-typed_data/Uint8List-class.html">Uint8List</a></span> <span class="parameter-name">data</span></span></li>
+</ol>)
+
+      
+
+    </section>
+    
+
+
+    
+<section class="summary source-code" id="source">
+  <h2><span>Implementation</span></h2>
+  <pre class="language-dart"><code class="language-dart">static HttpParseRes fromUint8ListToResponse(Uint8List data) {
+  final headerEndIndex = _findHeaderEnd(data);
+  bool isChunked = false;
+  http.Response? response;
+
+  if (headerEndIndex != -1) {
+    &#47;&#47; 解析Content-Length确定是否接收完整
+    final headersData = data.sublist(0, headerEndIndex);
+    String headersString;
+    try {
+      headersString = utf8.decode(headersData, allowMalformed: true);
+    } catch (e) {
+      headersString = latin1.decode(headersData);
+    }
+
+    final contentLengthMatch = RegExp(r&#39;content-length:\s*(\d+)&#39;, caseSensitive: false)
+        .firstMatch(headersString);
+
+    if (contentLengthMatch != null) {
+      final contentLength = int.tryParse(contentLengthMatch.group(1) ?? &#39;0&#39;) ?? 0;
+      final totalLength = headerEndIndex + 4 + contentLength;
+
+      if (data.length &gt;= totalLength) {
+        response = responseParse(Uint8List.fromList(data.sublist(0, totalLength)));
+      } else {
+        &#47;&#47; 继续等待更多数据
+        isChunked = true;
+      }
+    } else if (headersString.contains(RegExp(r&#39;transfer-encoding:\s*chunked&#39;, caseSensitive: false))) {
+      &#47;&#47; 处理分块传输编码
+      if (_isChunkedDataComplete(data, headerEndIndex)) {
+        response = responseParse(Uint8List.fromList(data));
+      } else {
+        isChunked = true;
+      }
+    } else {
+      &#47;&#47; 没有Content-Length且不是分块传输，假设已完成
+      response = responseParse(Uint8List.fromList(data));
+    }
+  }
+  return HttpParseRes(response: response, isChunked: isChunked);
+}</code></pre>
+</section>
+
+
+  </div> <!-- /.main-content -->
+  <div id="dartdoc-sidebar-left" class="sidebar sidebar-offcanvas-left">
+    <!-- The search input and breadcrumbs below are only responsively visible at low resolutions. -->
+<header id="header-search-sidebar" class="hidden-l">
+  <form class="search-sidebar" role="search">
+    <input type="text" id="search-sidebar" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+</header>
+<ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
+    <li><a href="../../index.html">proxyhttp</a></li>
+    <li><a href="../../socket_to_http_request/">socket_to_http_request</a></li>
+    <li><a href="../../socket_to_http_request/HttpParser-class.html">HttpParser</a></li>
+    <li class="self-crumb">fromUint8ListToResponse static method</li>
+</ol>
+
+    <h5>HttpParser class</h5>
+    <div id="dartdoc-sidebar-left-content"></div>
+  </div><!--/.sidebar-offcanvas-->
+  <div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
+</div><!--/.sidebar-offcanvas-->
+</main>
+<footer>
+  <span class="no-break">
+    proxyhttp
+      0.0.1
+  </span>
+  
+</footer>
+
+
+<script src="../../static-assets/highlight.pack.js?v1"></script>
+<script src="../../static-assets/docs.dart.js"></script>
+
+</body>
+</html>
+
