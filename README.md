@@ -46,3 +46,8 @@ class TestHttpInterceptor implements HttpInterceptor{
 _server = HttpProxyServer(port:"9000-9003").withInterceptor(TestHttpInterceptor());
 await _server.start();
 ```
+### start vpn
+```dart
+_proxyhttpPlugin.startVpn(proxyPort: _serverPort);
+```
+you can look [example](example) for detail
