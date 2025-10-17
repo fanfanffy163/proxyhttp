@@ -1,7 +1,7 @@
 # proxyhttp
 A Flutter plugin project aim to proxy http(currently no https) traffic
 
-## Getting Started
+## Dependencies
 Using :
 * xray core android lib wrapped by [v2rayNG](https://github.com/2dust/v2rayNG)
 * [hev-socks5-tunnel](https://github.com/heiher/hev-socks5-tunnel) transporting tun traffic to socks5
