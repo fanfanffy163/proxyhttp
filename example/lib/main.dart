@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'dart:async';
 
@@ -6,18 +9,44 @@ import 'package:proxyhttp/http_interceptor.dart';
 import 'package:proxyhttp/proxyhttp_server.dart';
 import 'package:proxyhttp/proxyhttp.dart';
 import 'package:http/http.dart' as http;
+import 'package:proxyhttp/socket_to_http_request.dart';
 
 class TestHttpInterceptor implements HttpInterceptor {
   @override
   Future<bool> onRequest(http.Request request) async {
     //print('请求拦截: ${HttpProxyServer.extractUnicodeCharacters(HttpParser.serializeRequest(request))} ');
-    return false; // 返回 true 继续处理请求，返回 false 则阻止请求
+    return false;
   }
 
   @override
   Future<bool> onResponse(http.Response response) async {
-    //print('响应拦截: ${response.statusCode} ${response.request?.url}');
-    return false; // 返回 true 继续处理响应，返回 false 则阻止响应
+    final originalBody = response.bodyBytes;
+    String? contentEncoding = response.headers['content-encoding']?.trim().toLowerCase();
+    List<int> uncompressedBody;
+
+    // 根据压缩类型解压响应体
+    if (contentEncoding == 'gzip') {
+      uncompressedBody = gzip.decode(originalBody);
+    } else if (contentEncoding == 'deflate') {
+      // 处理 deflate 压缩（注意：部分场景可能需要调整解压方式）
+      uncompressedBody = zlib.decode(originalBody);
+    } else {
+      // 无压缩或不支持的压缩类型，直接使用原始数据
+      uncompressedBody = originalBody;
+    }
+
+    // 构建状态行、头部和分隔符
+    final statusLine = 'HTTP/1.1 ${response.statusCode} ${response.reasonPhrase ?? ''}\r\n';
+    final headersString = response.headers.entries
+        .map((e) => '${e.key}: ${e.value}\r\n')
+        .join('');
+    final endOfHeaders = '\r\n';
+
+    // 拼接所有部分并返回
+    final head = utf8.encode(statusLine + headersString + endOfHeaders);
+    final r = Uint8List.fromList([...head, ...uncompressedBody]);
+    print('response: ${HttpProxyServer.extractUnicodeCharacters(r)} ');
+    return false;
   }
 }
 
@@ -56,6 +85,9 @@ class _MyAppState extends State<MyApp> {
       coreVersion = 'Failed to get core version.';
     }
 
+    _server = HttpProxyServer(port: "9000-9003").withInterceptor(TestHttpInterceptor());
+    await _server.start();
+
     // If the widget was removed from the tree while the asynchronous platform
     // message was in flight, we want to discard the reply rather than calling
     // setState to update our non-existent appearance.
@@ -63,11 +95,6 @@ class _MyAppState extends State<MyApp> {
 
     setState(() {
       _coreVersion = coreVersion;
-    });
-
-    _server = HttpProxyServer(port: "9000-9003").withInterceptor(TestHttpInterceptor());
-    await _server.start();
-    setState(() {
       _serverPort = _server.getRunningPort();
     });
   }
@@ -85,11 +112,11 @@ class _MyAppState extends State<MyApp> {
               child: Text('Running on: $_coreVersion\n'),
             ),
             Center(
-              child: Text('Server running on port: ${_server.getRunningPort()}\n'),
+              child: Text('Server running on port: $_serverPort\n'),
             ),
             ElevatedButton(
               onPressed: () {
-                _proxyhttpPlugin.startVpn(proxyPort: _server.getRunningPort());
+                _proxyhttpPlugin.startVpn(proxyPort: _serverPort);
               },
               child: const Text('Start VPN'),
             ),

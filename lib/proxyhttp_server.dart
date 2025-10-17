@@ -61,11 +61,16 @@ class HttpProxyServer {
       rethrow;
     }
 
-    // 监听客户端连接（Xray 会连接这里）
-    await for (final Socket clientSocket in _server) {
-      _logger.i('接收到新连接：${clientSocket.remoteAddress}:${clientSocket.remotePort}');
-      _handleClient(clientSocket); // 处理单个客户端请求
-    }
+    _server.listen(
+      (clientSocket){
+        _logger.i('接收到新连接：${clientSocket.remoteAddress}:${clientSocket.remotePort}');
+        _handleClient(clientSocket); // 处理单个客户端请求
+      },
+      onError: (error){
+        _logger.e('本地服务端数据处理异常',error: error);
+      },
+      onDone: () => stop(),
+    );
   }
 
   // 停止代理服务端
@@ -386,7 +391,7 @@ class HttpProxyServer {
   // }
 
   // // 从字节数据中提取Unicode字符（UTF-8）
-	static String _extractUnicodeCharacters(Uint8List data) {
+	static String extractUnicodeCharacters(Uint8List data) {
     // 使用允许畸形字节的UTF-8解码器
     // 无效字节会被替换为 �（Unicode替换字符 U+FFFD）
     final decoder = Utf8Decoder(allowMalformed: true);

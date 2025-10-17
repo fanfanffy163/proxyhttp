@@ -70,7 +70,7 @@ class HttpParser {
         throw FormatException('Invalid header format: $line');
       }
       
-      final name = line.substring(0, colonIndex).trim();
+      final name = line.substring(0, colonIndex).trim().toLowerCase();
       final value = line.substring(colonIndex + 1).trim();
       
       // 处理重复的头字段
@@ -182,7 +182,7 @@ class HttpParser {
         throw FormatException('Invalid header format: $line');
       }
       
-      final name = line.substring(0, colonIndex).trim();
+      final name = line.substring(0, colonIndex).trim().toLowerCase();
       final value = line.substring(colonIndex + 1).trim();
       
       // 处理重复的头字段
