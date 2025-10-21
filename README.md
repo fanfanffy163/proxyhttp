@@ -48,7 +48,7 @@ await _server.start();
 ```
 
 ### register plugin
-```ktl
+```kts
 class MainActivity : FlutterActivity(){
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if(requestCode == ProxyHttpVpn.Companion.VPN_START_CODE){
