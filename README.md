@@ -74,6 +74,23 @@ class MainActivity : FlutterActivity(){
 }
 ```
 
+### request vpn permission
+AndroidManifest.xml
+```xml
+<application
+	<---/>
+	<service
+		android:name="com.fan.proxyhttp.vpn.ProxyHttpVpn"
+		android:exported="true"
+		android:permission="android.permission.BIND_VPN_SERVICE">
+		<intent-filter>
+			<action android:name="andorid.net.VpnService" />
+		</intent-filter>
+	</service>
+	<---/>
+</application>
+```
+
 ### start vpn
 ```dart
 _proxyhttpPlugin.startVpn(proxyPort: _serverPort);
