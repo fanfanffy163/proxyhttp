@@ -48,6 +48,7 @@ await _server.start();
 ```
 
 ### register plugin
+MainActivity.kts
 ```kts
 class MainActivity : FlutterActivity(){
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
