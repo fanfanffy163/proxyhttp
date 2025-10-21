@@ -46,8 +46,37 @@ class TestHttpInterceptor implements HttpInterceptor{
 _server = HttpProxyServer(port:"9000-9003").withInterceptor(TestHttpInterceptor());
 await _server.start();
 ```
+
+### register plugin
+```ktl
+class MainActivity : FlutterActivity(){
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if(requestCode == ProxyHttpVpn.Companion.VPN_START_CODE){
+            if (resultCode == RESULT_OK) {
+                activity.startService(ProxyHttpVpn.startVpnIntent(activity))
+                return
+            }
+        }
+    }
+
+    /**
+     * register plugin
+     */
+    private fun pluginRegister(flutterEngine: FlutterEngine) {
+        flutterEngine.plugins.add(ProxyhttpPlugin())
+    }
+
+    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+        super.configureFlutterEngine(flutterEngine)
+        pluginRegister(flutterEngine)
+    }
+}
+```
+
 ### start vpn
 ```dart
 _proxyhttpPlugin.startVpn(proxyPort: _serverPort);
 ```
+
+
 you can look [example](example) for detail
